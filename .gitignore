@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Large generated data files
+data/shots_parts.parquet
+data/shots_trimmed.parquet

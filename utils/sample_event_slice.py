@@ -3,7 +3,7 @@ Sample script: extract skeleton data for a specific event category.
 Run with: .venv/bin/python3 sample_event_slice.py
 """
 
-from skeleton_data import SkeletonData, BodyPart, Team
+from utils.skeleton_data import SkeletonData, BodyPart, Team
 from event_data import EventParser
 
 PARQUET = "~/Downloads/HackathonData/anonymized-limbtracking.parquet"
