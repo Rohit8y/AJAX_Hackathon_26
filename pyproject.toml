@@ -10,5 +10,6 @@ dependencies = [
     "jupyter>=1.0",
     "ipykernel>=6.0",
     "pyarrow>=23.0.0",
-    "pypdf>=4.0.0"
+    "pypdf>=4.0.0",
+    "scipy>=1.17.1",
 ]
