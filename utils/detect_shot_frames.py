@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import numpy as np
 import pandas as pd
 
-from skeleton_data import SkeletonData
+from skeleton_data import SkeletonData, Phase
 from event_data import EventParser
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -52,9 +52,26 @@ sd     = SkeletonData(TRIMMED_PARQUET)
 parser = EventParser(XML, sd)
 events = parser.get_events(EVENT_CODES, pad_before_sec=0, pad_after_sec=0)
 
+# Phase boundaries for match-relative time
+meta = sd.metadata
+p1   = meta.frames_for_phase(Phase.FIRST_HALF)
+p2   = meta.frames_for_phase(Phase.SECOND_HALF)
+p1_start = p1.start_frame if p1 else 0
+p2_start = p2.start_frame if p2 else None
+framerate = meta.framerate
+
+def frame_to_match_time(frame: int) -> tuple[int, float]:
+    """Returns (half, match_time_s) where match_time_s is seconds from kickoff.
+    Half 1: 0s = kickoff. Half 2: 0s = second half kickoff (reported as 45:00+)."""
+    if p2_start is not None and frame >= p2_start:
+        return 2, 45 * 60 + (frame - p2_start) / framerate
+    return 1, (frame - p1_start) / framerate
+
 print(f"  ball frames   : {len(ball_df):,}")
 print(f"  parts rows    : {len(parts_df):,}")
 print(f"  shot events   : {len(events)}")
+print(f"  phase 1 start : frame {p1_start}")
+print(f"  phase 2 start : frame {p2_start}")
 
 # Pre-filter parts to foot parts only (speeds up per-event lookups)
 feet_df = parts_df[parts_df["body_part"].isin(FOOT_PARTS)].copy()
@@ -74,7 +91,7 @@ for ev in events:
         results.append({
             "event_id": ev.id, "event_code": ev.code,
             "event_start_frame": ev.start_frame, "event_end_frame": ev.end_frame,
-            "shot_frame": None, "shot_time_s": None,
+            "half": None, "shot_frame": None, "match_time_s": None, "match_time_mmss": None,
             "ball_acc_spike_mps2": None,
             "ball_speed_before_mps": None, "ball_speed_after_mps": None,
             "shooter_jersey": None, "shooter_team": None, "shooter_body_part": None,
@@ -84,13 +101,28 @@ for ev in events:
         continue
 
     window_ball = window_ball.reset_index(drop=True)
-    acc_mag = window_ball["ball_acc_mag"].to_numpy()
+    acc_mag    = window_ball["ball_acc_mag"].to_numpy()
+    ball_speed = window_ball["ball_speed"].to_numpy()
+    n          = len(ball_speed)
 
-    # --- Find peak acceleration frame ---
-    spike_idx   = int(np.nanargmax(acc_mag))
-    spike_acc   = float(acc_mag[spike_idx])
-    shot_frame  = int(window_ball.loc[spike_idx, "frame_number"])
-    shot_time_s = float(window_ball.loc[spike_idx, "t"])
+    # --- Find shot contact frame ---
+    # A real kick sends the ball from slow → fast.
+    # Score each frame by: speed 3 frames after minus speed 3 frames before.
+    # This filters out tracking artifacts (large acc but no real ball movement).
+    LOOK = 3
+    delta_speed = np.full(n, np.nan)
+    for i in range(n):
+        after  = ball_speed[i+1 : min(n, i+1+LOOK)]
+        before = ball_speed[max(0, i-LOOK) : i]
+        if len(after) > 0 and len(before) > 0:
+            delta_speed[i] = np.mean(after) - np.mean(before)
+
+    spike_idx = int(np.nanargmax(delta_speed))
+    spike_acc = float(acc_mag[spike_idx])
+    shot_frame = int(window_ball.loc[spike_idx, "frame_number"])
+    half, match_time_s = frame_to_match_time(shot_frame)
+    mins, secs = divmod(int(match_time_s), 60)
+    match_time_mmss = f"{mins:02d}:{secs:02d}"
 
     # Ball speed 3 frames before and after spike
     before = window_ball.loc[max(0, spike_idx - 3) : spike_idx - 1, "ball_speed"]
@@ -131,8 +163,10 @@ for ev in events:
         "event_code":           ev.code,
         "event_start_frame":    ev.start_frame,
         "event_end_frame":      ev.end_frame,
+        "half":                 half,
         "shot_frame":           shot_frame,
-        "shot_time_s":          round(shot_time_s, 3),
+        "match_time_s":         round(match_time_s, 1),
+        "match_time_mmss":      match_time_mmss,
         "ball_acc_spike_mps2":  round(spike_acc, 1),
         "ball_speed_before_mps": round(speed_before, 2) if not np.isnan(speed_before) else None,
         "ball_speed_after_mps":  round(speed_after,  2) if not np.isnan(speed_after)  else None,
@@ -155,7 +189,7 @@ print(f"  high confidence : {(~out['low_confidence']).sum()}")
 print(f"  low confidence  : {out['low_confidence'].sum()}")
 print()
 print(out[[
-    "event_code", "shot_frame", "shot_time_s",
+    "event_code", "half", "match_time_mmss",
     "ball_acc_spike_mps2", "ball_speed_after_mps",
     "shooter_jersey", "shooter_team", "foot_ball_dist_m", "low_confidence"
 ]].to_string(index=False))
