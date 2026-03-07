@@ -76,3 +76,27 @@ export const CASCADE_COLORS = {
 } as const;
 
 export type CascadeSegment = "pelvis" | "hip" | "knee" | "foot";
+
+// Ideal skeleton types
+export interface IdealShotData {
+  event_id: number;
+  match_time: string;
+  shooter_jersey: number;
+  kicking_side: string;
+  wcs_original: number;
+  wcs_ideal: number;
+  t: number[];
+  original_frames: [number, number, number][][]; // frames x 21 joints x [x,y,z]
+  ideal_frames: [number, number, number][][];
+  ideal_peak_times: Record<CascadeSegment, number>;
+  modification_flags: {
+    time_warped: boolean;
+    amplitude_scaled: boolean;
+    scale_factor_foot: number;
+  };
+  changed_joints: number[];
+}
+
+export interface IdealKinematicsData {
+  shots: IdealShotData[];
+}

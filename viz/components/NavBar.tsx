@@ -12,7 +12,9 @@ export default function NavBar() {
   const pathname = usePathname();
 
   return (
-    <header className="flex items-center gap-6 px-5 py-2.5 bg-gray-900 border-b border-gray-800 shrink-0">
+    <header className="flex items-center gap-6 px-5 py-2.5 bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/60 shrink-0"
+      style={{ borderImage: "linear-gradient(to right, transparent, #D2001A33, transparent) 1" }}
+    >
       <Link href="/" className="text-red-600 font-bold text-lg tracking-wide flex items-center gap-1.5 hover:text-red-500 transition-colors">
         <span>⚽</span>
         <span>AJAX 3D</span>
@@ -27,7 +29,7 @@ export default function NavBar() {
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
                 active
                   ? "bg-red-900/50 text-red-400 font-medium"
-                  : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
               }`}
             >
               {label}

@@ -8,10 +8,13 @@ import SkeletonContact from "@/components/kinematics/SkeletonContact";
 import PitchMini from "@/components/kinematics/PitchMini";
 import ShotStrip from "@/components/kinematics/ShotStrip";
 import ComparePanel from "@/components/kinematics/ComparePanel";
-import { KinematicsData, KinematicsShot, CASCADE_COLORS } from "@/components/kinematics/types";
+import IdealSkeletonCompare from "@/components/kinematics/IdealSkeletonCompare";
+import IdealScoreCard from "@/components/kinematics/IdealScoreCard";
+import { KinematicsData, KinematicsShot, IdealKinematicsData, IdealShotData, CASCADE_COLORS } from "@/components/kinematics/types";
 
 export default function KinematicsPage() {
   const [data, setData] = useState<KinematicsData | null>(null);
+  const [idealData, setIdealData] = useState<IdealKinematicsData | null>(null);
   const [activeId, setActiveId] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
@@ -26,14 +29,30 @@ export default function KinematicsPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetch("/data/ideal_kinematics.json")
+      .then((r) => r.json())
+      .then((d: IdealKinematicsData) => setIdealData(d))
+      .catch(() => {});
+  }, []);
+
   const shot = data?.shots.find((s) => s.id === activeId) ?? null;
+
+  // Match ideal shot to current shot by shooter_jersey + match_time
+  const idealShot: IdealShotData | null = (() => {
+    if (!shot || !idealData) return null;
+    return idealData.shots.find(
+      (s) => s.shooter_jersey === shot.shooter_jersey && s.match_time === shot.match_time
+    ) ?? null;
+  })();
 
   if (loading) {
     return (
       <div className="flex flex-col h-screen bg-gray-950 text-white">
         <NavBar />
-        <div className="flex-1 flex items-center justify-center text-gray-500">
-          Loading kinematics data…
+        <div className="flex-1 flex flex-col items-center justify-center text-gray-500 gap-3">
+          <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin-slow" />
+          <span className="text-sm">Loading kinematics data...</span>
         </div>
       </div>
     );
@@ -56,20 +75,33 @@ export default function KinematicsPage() {
 
       <div className="flex-1 overflow-y-auto">
         {/* Hero: Gauge */}
-        <section className="max-w-4xl mx-auto px-4 pt-6">
+        <section className="max-w-4xl mx-auto px-4 pt-6 animate-fade-in">
           <WhipChainGauge shot={shot} />
         </section>
 
+        {/* Ideal Score Card */}
+        {idealShot && (
+          <section className="max-w-5xl mx-auto px-4 pt-4 animate-fade-in">
+            <div className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 px-1">
+              Ideal Motion Optimization
+            </div>
+            <IdealScoreCard idealShot={idealShot} />
+          </section>
+        )}
+
         {/* Cascade Chart */}
-        <section className="max-w-5xl mx-auto px-4 pt-4 pb-2">
-          <CascadeChart shot={shot} />
+        <section className="max-w-5xl mx-auto px-4 pt-4 pb-2 animate-fade-in">
+          <CascadeChart
+            shot={shot}
+            idealPeakTimes={idealShot?.ideal_peak_times ?? null}
+          />
         </section>
 
         {/* Bottom panels: 3D Skeleton + Shot Context */}
         <section className="max-w-5xl mx-auto px-4 py-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* 3D Skeleton */}
-            <div>
+            <div className="animate-fade-in">
               <div className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 px-1">
                 Skeleton at Contact
               </div>
@@ -79,7 +111,7 @@ export default function KinematicsPage() {
             </div>
 
             {/* Shot Context */}
-            <div>
+            <div className="animate-fade-in">
               <div className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2 px-1">
                 Shot Context
               </div>
@@ -134,6 +166,13 @@ export default function KinematicsPage() {
             </div>
           </div>
         </section>
+
+        {/* Ideal Skeleton Compare */}
+        {idealShot && (
+          <section className="max-w-5xl mx-auto px-4 pb-4 animate-fade-in">
+            <IdealSkeletonCompare idealShot={idealShot} />
+          </section>
+        )}
 
         {/* Compare Panel */}
         <section className="max-w-5xl mx-auto px-4 pb-2">

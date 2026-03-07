@@ -43,7 +43,7 @@ export default function ShotStrip({ shots, activeId, onSelect }: Props) {
               key={shot.id}
               ref={active ? activeRef : undefined}
               onClick={() => onSelect(shot.id)}
-              className={`flex-shrink-0 w-24 rounded-lg px-2.5 py-2 text-left transition-all ${
+              className={`flex-shrink-0 w-24 rounded-lg px-2.5 py-2 text-left transition-all duration-200 hover:scale-[1.02] ${
                 active
                   ? "bg-red-900/30 border-red-500 ring-1 ring-red-500/30 scale-105"
                   : "bg-gray-800/50 border-gray-700 hover:bg-gray-800 hover:border-gray-600"

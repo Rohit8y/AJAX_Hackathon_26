@@ -39,7 +39,6 @@ export default function Home() {
   const [showGaze, setShowGaze] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load shot index on mount
   useEffect(() => {
     fetch("/data/shots_index.json")
       .then((r) => r.json())
@@ -47,7 +46,6 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Load shot JSON on selection
   useEffect(() => {
     setLoading(true);
     setIsPlaying(false);
@@ -63,7 +61,6 @@ export default function Home() {
       .catch(() => setLoading(false));
   }, [activeShotIdx]);
 
-  // Playback interval
   useEffect(() => {
     if (!shotData || !isPlaying) {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -96,7 +93,6 @@ export default function Home() {
 
   const currentFrame = shotData?.frames[frameIndex] ?? null;
 
-  // Compute closest player to ball for stats overlay
   const closestInfo = (() => {
     if (!currentFrame?.ball || !shotData) return null;
     const [bx, by] = currentFrame.ball;
@@ -126,13 +122,10 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white">
       <NavBar />
-      {loading && (
-        <div className="px-4 py-1 bg-gray-900 text-yellow-400 text-sm animate-pulse">Loading…</div>
-      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-52 bg-gray-900 border-r border-gray-800 flex flex-col overflow-y-auto shrink-0">
+        <aside className="w-52 bg-gray-900/60 backdrop-blur-xl border-r border-gray-800/50 flex flex-col overflow-y-auto shrink-0">
           <div className="px-3 pt-3 pb-1 text-xs text-gray-500 uppercase tracking-widest font-semibold">
             Shot Clips
           </div>
@@ -140,11 +133,12 @@ export default function Home() {
             <button
               key={meta.idx}
               onClick={() => setActiveShotIdx(meta.idx)}
-              className={`text-left px-3 py-2.5 text-sm border-b border-gray-800 transition-colors ${
+              className={`text-left px-3 py-2.5 text-sm border-b border-gray-800/50 transition-all hover:scale-[1.02] ${
                 activeShotIdx === meta.idx
                   ? "bg-red-900/40 text-red-400 border-l-2 border-l-red-600"
-                  : "text-gray-300 hover:bg-gray-800"
+                  : "text-gray-300 hover:bg-gray-800/60"
               }`}
+              style={activeShotIdx === meta.idx ? { boxShadow: "0 0 12px rgba(210,0,26,0.2)" } : undefined}
             >
               <div className="font-medium">Shot {meta.idx + 1}</div>
               <div className="text-xs text-gray-500 mt-0.5">
@@ -155,8 +149,8 @@ export default function Home() {
 
           {/* Metadata panel */}
           {shotData && currentFrame && (
-            <div className="mt-auto px-3 py-3 border-t border-gray-800 space-y-2">
-              <div className="pb-1 border-b border-gray-800">
+            <div className="mt-auto px-3 py-3 border-t border-gray-800/50 space-y-2">
+              <div className="pb-1 border-b border-gray-800/50">
                 <div className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1.5">Overlays</div>
                 <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
                   <input type="checkbox" checked={showGaze} onChange={(e) => setShowGaze(e.target.checked)} className="accent-red-600" />
@@ -210,30 +204,33 @@ export default function Home() {
         {/* 3D Canvas */}
         <main className="flex-1 relative">
           {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-              Loading shot data…
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 gap-3">
+              <div className="w-8 h-8 border-2 border-red-600 border-t-transparent rounded-full animate-spin-slow" />
+              <span className="text-sm">Loading shot data...</span>
             </div>
           ) : !shotData ? (
             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
               No data available
             </div>
           ) : (
-            <Canvas
-              camera={{
-                position: [0, 40, 55],
-                fov: 55,
-                near: 0.1,
-                far: 500,
-              }}
-              gl={{ antialias: true }}
-              style={{ background: "#0a0a14" }}
-            >
-              <ShotScene
-                frame={currentFrame}
-                jointNames={shotData.joint_names}
-                showGaze={showGaze}
-              />
-            </Canvas>
+            <div className="w-full h-full animate-fade-in">
+              <Canvas
+                camera={{
+                  position: [0, 40, 55],
+                  fov: 55,
+                  near: 0.1,
+                  far: 500,
+                }}
+                gl={{ antialias: true }}
+                style={{ background: "#0a0a14" }}
+              >
+                <ShotScene
+                  frame={currentFrame}
+                  jointNames={shotData.joint_names}
+                  showGaze={showGaze}
+                />
+              </Canvas>
+            </div>
           )}
         </main>
       </div>

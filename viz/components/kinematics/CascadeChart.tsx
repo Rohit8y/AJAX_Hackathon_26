@@ -6,6 +6,7 @@ import { KinematicsShot, CASCADE_COLORS, CascadeSegment } from "./types";
 interface Props {
   shot: KinematicsShot;
   compareShot?: KinematicsShot | null;
+  idealPeakTimes?: Record<CascadeSegment, number> | null;
   height?: number;
 }
 
@@ -36,7 +37,7 @@ function cardinalSpline(points: [number, number][], tension = 0.4): string {
   return d;
 }
 
-export default function CascadeChart({ shot, compareShot, height = 300 }: Props) {
+export default function CascadeChart({ shot, compareShot, idealPeakTimes, height = 300 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<{ x: number; t: number; values: Record<CascadeSegment, number> } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -223,6 +224,33 @@ export default function CascadeChart({ shot, compareShot, height = 300 }: Props)
             />
           </g>
         ))}
+
+        {/* Ideal peak time lines */}
+        {idealPeakTimes && SEGMENTS.map(seg => {
+          const t = idealPeakTimes[seg.key];
+          if (t === undefined || t < tMin || t > tMax) return null;
+          const ix = xScale(t);
+          return (
+            <g key={`ideal-${seg.key}`}>
+              <line
+                x1={ix} y1={PADDING.top} x2={ix} y2={PADDING.top + plotH}
+                stroke={CASCADE_COLORS[seg.key]}
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                opacity={0.5}
+              />
+              <text
+                x={ix} y={PADDING.top - 4}
+                fill={CASCADE_COLORS[seg.key]}
+                fontSize={9}
+                textAnchor="middle"
+                opacity={0.7}
+              >
+                ideal
+              </text>
+            </g>
+          );
+        })}
 
         {/* Legend */}
         {SEGMENTS.map((seg, i) => {
