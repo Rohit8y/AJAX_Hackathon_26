@@ -45,10 +45,10 @@ parts_raw = flat[["frame_number", "jersey_number", "team", "team_name",
                    "body_part", "body_part_name",
                    "pos_x", "pos_y", "pos_z"]].copy()
 
-# cm → m, frame_number → t
-parts_raw["x"] = parts_raw["pos_x"] / 100.0
-parts_raw["y"] = parts_raw["pos_y"] / 100.0
-parts_raw["z"] = parts_raw["pos_z"] / 100.0
+# positions already in metres, frame_number → t
+parts_raw["x"] = parts_raw["pos_x"]
+parts_raw["y"] = parts_raw["pos_y"]
+parts_raw["z"] = parts_raw["pos_z"]
 parts_raw["t"] = parts_raw["frame_number"] / framerate
 parts_raw.drop(columns=["pos_x", "pos_y", "pos_z"], inplace=True)
 
@@ -59,9 +59,9 @@ ball_raw = (
     .drop_duplicates("frame_number")
     .copy()
 )
-ball_raw["bx"] = ball_raw["ball_x"] / 100.0   # cm → m
-ball_raw["by"] = ball_raw["ball_y"] / 100.0
-ball_raw["bz"] = ball_raw["ball_z"] / 100.0
+ball_raw["bx"] = ball_raw["ball_x"]   # already in metres
+ball_raw["by"] = ball_raw["ball_y"]
+ball_raw["bz"] = ball_raw["ball_z"]
 ball_raw["bvx"] = ball_raw["ball_vx"]          # already m/s
 ball_raw["bvy"] = ball_raw["ball_vy"]
 ball_raw["bvz"] = ball_raw["ball_vz"]
