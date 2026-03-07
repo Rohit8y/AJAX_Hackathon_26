@@ -67,38 +67,20 @@ def frame_to_match_time(frame: int) -> tuple[int, float]:
         return 2, 45 * 60 + (frame - p2_start) / framerate
     return 1, (frame - p1_start) / framerate
 
-# Goal positions: pitch playable length = pitch_long - left_padding - right_padding (all in dm → /10 = m)
-goal_x = (meta.pitch_long - meta.pitch_padding_left - meta.pitch_padding_right) / 10 / 2
-GOALS  = np.array([[goal_x, 0.0], [-goal_x, 0.0]])  # metres
-
-def goal_direction_scores(bx_arr, by_arr, bvx_arr, bvy_arr, spd_arr):
+def goal_direction_scores(bvx_arr, spd_arr):
     """
-    For each frame, compute max cos(angle) between ball velocity and direction to either goal.
-    Returns array of shape (N,) in [0, 1]. Near 1 = ball heading straight toward a goal.
+    Fraction of ball speed in the X direction (goals are on the X axis).
+    |bvx| / speed → near 1 = ball heading straight toward a goal, near 0 = lateral pass.
+    Does not depend on ball position so it is robust to coordinate-system scale.
     """
-    n = len(bx_arr)
-    best = np.zeros(n)
-    for gx, gy in GOALS:
-        to_gx = gx - bx_arr
-        to_gy = gy - by_arr
-        dist  = np.sqrt(to_gx**2 + to_gy**2)
-        # normalised direction to goal
-        to_gx_n = to_gx / np.where(dist > 0.01, dist, np.nan)
-        to_gy_n = to_gy / np.where(dist > 0.01, dist, np.nan)
-        # normalised ball velocity
-        safe_spd = np.where(spd_arr > 0.5, spd_arr, np.nan)
-        dx = bvx_arr / safe_spd
-        dy = bvy_arr / safe_spd
-        cos_a = dx * to_gx_n + dy * to_gy_n
-        best = np.maximum(best, np.nan_to_num(cos_a, nan=0.0))
-    return best
+    safe_spd = np.where(spd_arr > 0.5, spd_arr, np.nan)
+    return np.abs(np.nan_to_num(bvx_arr / safe_spd, nan=0.0))
 
 print(f"  ball frames   : {len(ball_df):,}")
 print(f"  parts rows    : {len(parts_df):,}")
 print(f"  shot events   : {len(events)}")
 print(f"  phase 1 start : frame {p1_start}")
 print(f"  phase 2 start : frame {p2_start}")
-print(f"  goal x        : ±{goal_x:.1f} m")
 
 # Pre-filter parts to foot parts only (speeds up per-event lookups)
 feet_df = parts_df[parts_df["body_part"].isin(FOOT_PARTS)].copy()
@@ -145,11 +127,8 @@ for ev in events:
         if len(after) > 0 and len(before) > 0:
             delta_speed[i] = np.mean(after) - np.mean(before)
 
-    bx_a   = window_ball["bx"].to_numpy()
-    by_a   = window_ball["by"].to_numpy()
     bvx_a  = window_ball["bvx"].to_numpy()
-    bvy_a  = window_ball["bvy"].to_numpy()
-    goal_cos = goal_direction_scores(bx_a, by_a, bvx_a, bvy_a, ball_speed)
+    goal_cos = goal_direction_scores(bvx_a, ball_speed)
 
     shot_score = np.nan_to_num(delta_speed, nan=0.0) * goal_cos
     spike_idx  = int(np.argmax(shot_score))
