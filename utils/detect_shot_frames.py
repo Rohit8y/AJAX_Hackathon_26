@@ -67,11 +67,38 @@ def frame_to_match_time(frame: int) -> tuple[int, float]:
         return 2, 45 * 60 + (frame - p2_start) / framerate
     return 1, (frame - p1_start) / framerate
 
+# Goal positions: pitch playable length = pitch_long - left_padding - right_padding (all in dm → /10 = m)
+goal_x = (meta.pitch_long - meta.pitch_padding_left - meta.pitch_padding_right) / 10 / 2
+GOALS  = np.array([[goal_x, 0.0], [-goal_x, 0.0]])  # metres
+
+def goal_direction_scores(bx_arr, by_arr, bvx_arr, bvy_arr, spd_arr):
+    """
+    For each frame, compute max cos(angle) between ball velocity and direction to either goal.
+    Returns array of shape (N,) in [0, 1]. Near 1 = ball heading straight toward a goal.
+    """
+    n = len(bx_arr)
+    best = np.zeros(n)
+    for gx, gy in GOALS:
+        to_gx = gx - bx_arr
+        to_gy = gy - by_arr
+        dist  = np.sqrt(to_gx**2 + to_gy**2)
+        # normalised direction to goal
+        to_gx_n = to_gx / np.where(dist > 0.01, dist, np.nan)
+        to_gy_n = to_gy / np.where(dist > 0.01, dist, np.nan)
+        # normalised ball velocity
+        safe_spd = np.where(spd_arr > 0.5, spd_arr, np.nan)
+        dx = bvx_arr / safe_spd
+        dy = bvy_arr / safe_spd
+        cos_a = dx * to_gx_n + dy * to_gy_n
+        best = np.maximum(best, np.nan_to_num(cos_a, nan=0.0))
+    return best
+
 print(f"  ball frames   : {len(ball_df):,}")
 print(f"  parts rows    : {len(parts_df):,}")
 print(f"  shot events   : {len(events)}")
 print(f"  phase 1 start : frame {p1_start}")
 print(f"  phase 2 start : frame {p2_start}")
+print(f"  goal x        : ±{goal_x:.1f} m")
 
 # Pre-filter parts to foot parts only (speeds up per-event lookups)
 feet_df = parts_df[parts_df["body_part"].isin(FOOT_PARTS)].copy()
@@ -106,9 +133,10 @@ for ev in events:
     n          = len(ball_speed)
 
     # --- Find shot contact frame ---
-    # A real kick sends the ball from slow → fast.
-    # Score each frame by: speed 3 frames after minus speed 3 frames before.
-    # This filters out tracking artifacts (large acc but no real ball movement).
+    # Score = delta_speed × goal_cos:
+    #   delta_speed: ball speed after - before contact (real kick sends slow ball fast)
+    #   goal_cos:    cos(angle between ball velocity and direction to nearest goal)
+    #                → passes go sideways (low score), shots go toward goal (high score)
     LOOK = 3
     delta_speed = np.full(n, np.nan)
     for i in range(n):
@@ -117,8 +145,15 @@ for ev in events:
         if len(after) > 0 and len(before) > 0:
             delta_speed[i] = np.mean(after) - np.mean(before)
 
-    spike_idx = int(np.nanargmax(delta_speed))
-    spike_acc = float(acc_mag[spike_idx])
+    bx_a   = window_ball["bx"].to_numpy()
+    by_a   = window_ball["by"].to_numpy()
+    bvx_a  = window_ball["bvx"].to_numpy()
+    bvy_a  = window_ball["bvy"].to_numpy()
+    goal_cos = goal_direction_scores(bx_a, by_a, bvx_a, bvy_a, ball_speed)
+
+    shot_score = np.nan_to_num(delta_speed, nan=0.0) * goal_cos
+    spike_idx  = int(np.argmax(shot_score))
+    spike_acc  = float(acc_mag[spike_idx])
     shot_frame = int(window_ball.loc[spike_idx, "frame_number"])
     half, match_time_s = frame_to_match_time(shot_frame)
     mins, secs = divmod(int(match_time_s), 60)
@@ -130,31 +165,44 @@ for ev in events:
     speed_before = float(before.mean()) if not before.empty else np.nan
     speed_after  = float(after.mean())  if not after.empty  else np.nan
 
-    # Ball position at spike frame (metres)
-    bx = float(window_ball.loc[spike_idx, "bx"])
-    by = float(window_ball.loc[spike_idx, "by"])
-    bz = float(window_ball.loc[spike_idx, "bz"])
-
-    # --- Find closest foot at spike frame ---
-    frame_feet = feet_df[feet_df["frame_number"] == shot_frame].copy()
+    # --- Find shooter by minimum foot-ball distance in [shot_frame-3, shot_frame] ---
+    # At shot_frame the ball has already left the foot (ball moves ~1m/frame at 25 m/s).
+    # The actual contact is the frame just before the ball speed jumps — where the foot
+    # is closest to the ball. Scan backwards to find it.
+    CONTACT_LOOKBACK = 3
 
     shooter_jersey = None
     shooter_team   = None
     shooter_part   = None
-    foot_dist      = np.nan
+    foot_dist      = np.inf
 
-    if not frame_feet.empty:
-        frame_feet = frame_feet.copy()
-        frame_feet["dist_m"] = np.sqrt(
-            (frame_feet["x"] - bx) ** 2 +
-            (frame_feet["y"] - by) ** 2 +
-            (frame_feet["z"] - bz) ** 2
+    for offset in range(-CONTACT_LOOKBACK, 1):   # -3, -2, -1, 0
+        check_frame = shot_frame + offset
+        ball_row = ball_df[ball_df["frame_number"] == check_frame]
+        if ball_row.empty:
+            continue
+        cbx = float(ball_row["bx"].iloc[0])
+        cby = float(ball_row["by"].iloc[0])
+        cbz = float(ball_row["bz"].iloc[0])
+
+        ff = feet_df[feet_df["frame_number"] == check_frame].copy()
+        if ff.empty:
+            continue
+        ff["dist_m"] = np.sqrt(
+            (ff["x"] - cbx) ** 2 +
+            (ff["y"] - cby) ** 2 +
+            (ff["z"] - cbz) ** 2
         )
-        closest = frame_feet.loc[frame_feet["dist_m"].idxmin()]
-        shooter_jersey = int(closest["jersey_number"])
-        shooter_team   = str(closest["team_name"])
-        shooter_part   = str(closest["body_part_name"])
-        foot_dist      = float(closest["dist_m"])
+        row = ff.loc[ff["dist_m"].idxmin()]
+        d   = float(row["dist_m"])
+        if d < foot_dist:
+            foot_dist      = d
+            shooter_jersey = int(row["jersey_number"])
+            shooter_team   = str(row["team_name"])
+            shooter_part   = str(row["body_part_name"])
+
+    if foot_dist == np.inf:
+        foot_dist = np.nan
 
     low_confidence = (spike_acc < MIN_ACC_MPS2) or (np.isnan(foot_dist)) or (foot_dist > MAX_FOOT_DIST_M)
 
