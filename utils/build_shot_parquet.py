@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pyarrow.parquet as pq
 
-from utils.skeleton_data import SkeletonData
+from skeleton_data import SkeletonData
 from event_data import EventParser
 
 # ── Config ────────────────────────────────────────────────────────────────────
