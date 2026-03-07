@@ -67,14 +67,39 @@ def frame_to_match_time(frame: int) -> tuple[int, float]:
         return 2, 45 * 60 + (frame - p2_start) / framerate
     return 1, (frame - p1_start) / framerate
 
-def goal_direction_scores(bvx_arr, spd_arr):
+FAR_FROM_GOAL_M = 35.0   # if spike is farther than this from either goal → use position-based goal_cos
+
+# Goal positions in metres (same coordinate system as ball bx/by)
+goal_x = (meta.pitch_long - meta.pitch_padding_left - meta.pitch_padding_right) / 10 / 2
+GOALS  = np.array([[goal_x, 0.0], [-goal_x, 0.0]])
+
+def goal_cos_xonly(bvx_arr, spd_arr):
     """
-    Fraction of ball speed in the X direction (goals are on the X axis).
-    |bvx| / speed → near 1 = ball heading straight toward a goal, near 0 = lateral pass.
-    Does not depend on ball position so it is robust to coordinate-system scale.
+    |bvx| / speed — fraction of ball speed in the X direction.
+    Goals lie on the X axis so this filters lateral passes (low score) from
+    shots toward goal (high score) without depending on ball position.
     """
     safe_spd = np.where(spd_arr > 0.5, spd_arr, np.nan)
     return np.abs(np.nan_to_num(bvx_arr / safe_spd, nan=0.0))
+
+def goal_cos_pos(bx_arr, by_arr, bvx_arr, bvy_arr, spd_arr):
+    """
+    cos(angle between ball velocity and direction to nearest goal), computed
+    from actual ball position. Correctly handles wide-angle shots from near
+    the goal line that have large bvy components.
+    """
+    n = len(bx_arr)
+    best = np.zeros(n)
+    safe_spd = np.where(spd_arr > 0.5, spd_arr, np.nan)
+    for gx, gy in GOALS:
+        to_gx = gx - bx_arr; to_gy = gy - by_arr
+        dist  = np.sqrt(to_gx**2 + to_gy**2)
+        to_gx_n = to_gx / np.where(dist > 0.1, dist, np.nan)
+        to_gy_n = to_gy / np.where(dist > 0.1, dist, np.nan)
+        dx = bvx_arr / safe_spd; dy = bvy_arr / safe_spd
+        cos_a = dx * to_gx_n + dy * to_gy_n
+        best = np.maximum(best, np.nan_to_num(cos_a, nan=0.0))
+    return best
 
 print(f"  ball frames   : {len(ball_df):,}")
 print(f"  parts rows    : {len(parts_df):,}")
@@ -127,11 +152,27 @@ for ev in events:
         if len(after) > 0 and len(before) > 0:
             delta_speed[i] = np.mean(after) - np.mean(before)
 
+    bx_a   = window_ball["bx"].to_numpy()
+    by_a   = window_ball["by"].to_numpy()
     bvx_a  = window_ball["bvx"].to_numpy()
-    goal_cos = goal_direction_scores(bvx_a, ball_speed)
+    bvy_a  = window_ball["bvy"].to_numpy()
 
-    shot_score = np.nan_to_num(delta_speed, nan=0.0) * goal_cos
+    # Phase 1: |bvx|/speed — filters lateral passes, robust for most shots
+    gc1       = goal_cos_xonly(bvx_a, ball_speed)
+    shot_score = np.nan_to_num(delta_speed, nan=0.0) * gc1
     spike_idx  = int(np.argmax(shot_score))
+
+    # Phase 2: if winning frame is far from both goals (>35 m) the xonly
+    # winner is likely a long pass that set up the real shot. Re-score using
+    # position-based goal_cos which correctly handles wide-angle near-goal
+    # shots that have large bvy (e.g. ball coming in from the flank).
+    spike_bx = bx_a[spike_idx]; spike_by = by_a[spike_idx]
+    dist_to_goal = min(np.sqrt((gx-spike_bx)**2+(gy-spike_by)**2) for gx,gy in GOALS)
+    if dist_to_goal > FAR_FROM_GOAL_M:
+        gc2        = goal_cos_pos(bx_a, by_a, bvx_a, bvy_a, ball_speed)
+        shot_score = np.nan_to_num(delta_speed, nan=0.0) * gc2
+        spike_idx  = int(np.argmax(shot_score))
+
     spike_acc  = float(acc_mag[spike_idx])
     shot_frame = int(window_ball.loc[spike_idx, "frame_number"])
     half, match_time_s = frame_to_match_time(shot_frame)
