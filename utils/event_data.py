@@ -28,7 +28,7 @@ from typing import Optional
 
 import pandas as pd
 
-from utils.skeleton_data import SkeletonData, Phase, BodyPart, Frame, GameMetadata
+from skeleton_data import SkeletonData, Phase, BodyPart, Frame, GameMetadata
 
 
 # ── Event dataclass ───────────────────────────────────────────────────────────
