@@ -35,6 +35,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showGaze, setShowGaze] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load shot index on mount
@@ -158,6 +159,13 @@ export default function Home() {
           {/* Metadata panel */}
           {shotData && currentFrame && (
             <div className="mt-auto px-3 py-3 border-t border-gray-800 space-y-2">
+              <div className="pb-1 border-b border-gray-800">
+                <div className="text-xs text-gray-500 uppercase tracking-widest font-semibold mb-1.5">Overlays</div>
+                <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+                  <input type="checkbox" checked={showGaze} onChange={(e) => setShowGaze(e.target.checked)} className="accent-red-600" />
+                  Gaze to ball
+                </label>
+              </div>
               <div className="text-xs text-gray-500 uppercase tracking-widest font-semibold">
                 Stats
               </div>
@@ -226,6 +234,7 @@ export default function Home() {
               <ShotScene
                 frame={currentFrame}
                 jointNames={shotData.joint_names}
+                showGaze={showGaze}
               />
             </Canvas>
           )}

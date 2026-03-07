@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { PlayerFrame, ShotData } from "./types";
+import GazeOverlay from "./GazeOverlay";
 
 // Team colors
 const TEAM_COLORS: Record<number, string> = {
@@ -46,9 +47,11 @@ const BONE_PAIRS: [string, string][] = [
 interface Props {
   player: PlayerFrame;
   jointNames: ShotData["joint_names"];
+  showGaze?: boolean;
+  ballPos?: THREE.Vector3 | null;
 }
 
-export default function PlayerSkeleton({ player, jointNames }: Props) {
+export default function PlayerSkeleton({ player, jointNames, showGaze, ballPos }: Props) {
   const color = TEAM_COLORS[player.team] ?? "#AAAAAA";
 
   // Build name -> [x, y, z] lookup, mapping data Y->Three.js Z (field XY -> XZ plane)
@@ -107,6 +110,11 @@ export default function PlayerSkeleton({ player, jointNames }: Props) {
           <sphereGeometry args={[0.15, 8, 8]} />
           <meshBasicMaterial color={color} transparent opacity={0.7} />
         </mesh>
+      )}
+
+      {/* Gaze overlay */}
+      {showGaze && ballPos && (
+        <GazeOverlay jointMap={jointMap} ballPos={ballPos} />
       )}
     </group>
   );

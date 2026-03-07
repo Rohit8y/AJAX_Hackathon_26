@@ -9,6 +9,7 @@ import PlayerSkeleton from "./PlayerSkeleton";
 interface Props {
   frame: ShotFrame | null;
   jointNames: ShotData["joint_names"];
+  showGaze: boolean;
 }
 
 // Field dimensions: x ∈ [-56,56], y ∈ [-39,38]
@@ -110,7 +111,7 @@ function PitchMarkings() {
   );
 }
 
-export default function ShotScene({ frame, jointNames }: Props) {
+export default function ShotScene({ frame, jointNames, showGaze }: Props) {
   if (!frame) return null;
 
   const ballPos =
@@ -137,6 +138,8 @@ export default function ShotScene({ frame, jointNames }: Props) {
           key={`${player.jersey}-${player.team}-${i}`}
           player={player}
           jointNames={jointNames}
+          showGaze={showGaze}
+          ballPos={ballPos}
         />
       ))}
 
