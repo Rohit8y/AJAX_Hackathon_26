@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import ShotScene from "@/components/ShotScene";
 import Playback from "@/components/Playback";
+import NavBar from "@/components/NavBar";
 import { ShotData } from "@/components/types";
 
 interface ShotMeta {
@@ -124,14 +125,10 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="flex items-center gap-4 px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0">
-        <div className="text-red-600 font-bold text-lg tracking-wide">⚽ AJAX 3D</div>
-        <div className="text-gray-400 text-sm">Shot Skeleton Visualizer</div>
-        {loading && (
-          <div className="ml-auto text-yellow-400 text-sm animate-pulse">Loading…</div>
-        )}
-      </header>
+      <NavBar />
+      {loading && (
+        <div className="px-4 py-1 bg-gray-900 text-yellow-400 text-sm animate-pulse">Loading…</div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}

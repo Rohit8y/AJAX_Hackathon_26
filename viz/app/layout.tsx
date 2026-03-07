@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ajax 3D Shot Visualizer",
-  description: "3D skeleton animation from Ajax shot tracking data",
+  title: "Ajax 3D Shot Visualizer · WhipChain Analytics",
+  description: "3D skeleton animation and WhipChain kinematics analysis from Ajax shot tracking data",
 };
 
 export default function RootLayout({
