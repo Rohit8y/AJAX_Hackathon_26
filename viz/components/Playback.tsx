@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 interface Props {
   fps: number;
   totalFrames: number;
@@ -35,7 +33,7 @@ export default function Playback({
   };
 
   return (
-    <div className="flex items-center gap-3 bg-gray-900 border-t border-gray-700 px-4 py-2">
+    <div className="flex items-center gap-3 bg-gray-900/60 backdrop-blur-xl border-t border-gray-700/50 px-4 py-2">
       {/* Buttons */}
       <button
         onClick={onReset}
@@ -62,7 +60,7 @@ export default function Playback({
           max={totalFrames - 1}
           value={currentIndex}
           onChange={(e) => onSeek(Number(e.target.value))}
-          className="flex-1 accent-red-600 h-1"
+          className="flex-1 slider-red h-1"
         />
         <span className="text-gray-400 text-xs font-mono w-12">
           {fmt(duration)}
