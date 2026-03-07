@@ -9,4 +9,6 @@ dependencies = [
     "plotly>=5.18",
     "jupyter>=1.0",
     "ipykernel>=6.0",
+    "pyarrow>=23.0.0",
+    "pypdf>=4.0.0"
 ]
