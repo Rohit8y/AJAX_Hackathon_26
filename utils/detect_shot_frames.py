@@ -40,6 +40,9 @@ EVENT_CODES = [
 FOOT_PARTS      = [16, 17, 19, 21]   # left_ankle, right_ankle, left_toe, right_toe
 MIN_ACC_MPS2    = 50.0               # below this → no clear contact detected
 MAX_FOOT_DIST_M = 2.0                # above this → shooter ID is unreliable
+LATER_CONTACT_LOOKAHEAD_FRAMES    = 25
+LATER_CONTACT_MIN_ACC_RATIO       = 0.75
+LATER_CONTACT_MIN_FOOT_GAIN_M     = 0.15
 
 # ── Load ──────────────────────────────────────────────────────────────────────
 
@@ -109,6 +112,96 @@ print(f"  phase 2 start : frame {p2_start}")
 
 # Pre-filter parts to foot parts only (speeds up per-event lookups)
 feet_df = parts_df[parts_df["body_part"].isin(FOOT_PARTS)].copy()
+ball_by_frame = ball_df.set_index("frame_number", drop=False).sort_index()
+feet_by_frame = feet_df.set_index("frame_number", drop=False).sort_index()
+
+def nearest_foot_contact(frame: int) -> tuple[float, int | None, str | None, str | None]:
+    """Closest foot-to-ball contact at exactly one frame."""
+    try:
+        ball_row = ball_by_frame.loc[frame]
+    except KeyError:
+        return np.nan, None, None, None
+
+    try:
+        ff = feet_by_frame.loc[frame]
+    except KeyError:
+        return np.nan, None, None, None
+
+    if isinstance(ff, pd.Series):
+        ff = ff.to_frame().T
+
+    dist = np.sqrt(
+        (ff["x"] - float(ball_row["bx"])) ** 2 +
+        (ff["y"] - float(ball_row["by"])) ** 2 +
+        (ff["z"] - float(ball_row["bz"])) ** 2
+    )
+    best_pos = int(np.argmin(dist.to_numpy()))
+    best_row = ff.iloc[best_pos]
+    return (
+        float(dist.iloc[best_pos]),
+        int(best_row["jersey_number"]),
+        str(best_row["team_name"]),
+        str(best_row["body_part_name"]),
+    )
+
+def best_contact_in_lookback(frame: int, lookback_frames: int) -> tuple[float, int | None, str | None, str | None]:
+    """Best contact in [frame-lookback_frames, frame]. Used for shooter ID."""
+    best_dist = np.nan
+    best_jersey = None
+    best_team = None
+    best_part = None
+
+    for check_frame in range(frame - lookback_frames, frame + 1):
+        dist, jersey, team, part = nearest_foot_contact(check_frame)
+        if np.isnan(dist):
+            continue
+        if np.isnan(best_dist) or dist < best_dist:
+            best_dist = dist
+            best_jersey = jersey
+            best_team = team
+            best_part = part
+
+    return best_dist, best_jersey, best_team, best_part
+
+def is_local_peak(arr: np.ndarray, idx: int) -> bool:
+    return 0 < idx < len(arr) - 1 and arr[idx] >= arr[idx - 1] and arr[idx] >= arr[idx + 1]
+
+def maybe_promote_later_contact(window_ball: pd.DataFrame, acc_mag: np.ndarray, spike_idx: int) -> int:
+    """
+    Promote a later contact only when the current winner looks like a setup touch:
+    a later local-peak contact must keep most of the acceleration while improving
+    exact-frame foot contact materially.
+    """
+    current_frame = int(window_ball.loc[spike_idx, "frame_number"])
+    current_acc = float(acc_mag[spike_idx])
+    current_exact_dist, _, _, _ = nearest_foot_contact(current_frame)
+    if np.isnan(current_exact_dist):
+        return spike_idx
+
+    best_idx = spike_idx
+    best_score = -np.inf
+    end_idx = min(len(window_ball) - 2, spike_idx + LATER_CONTACT_LOOKAHEAD_FRAMES)
+
+    for cand_idx in range(spike_idx + 1, end_idx + 1):
+        cand_acc = float(acc_mag[cand_idx])
+        if cand_acc < current_acc * LATER_CONTACT_MIN_ACC_RATIO:
+            continue
+        if not is_local_peak(acc_mag, cand_idx):
+            continue
+
+        cand_frame = int(window_ball.loc[cand_idx, "frame_number"])
+        cand_exact_dist, _, _, _ = nearest_foot_contact(cand_frame)
+        if np.isnan(cand_exact_dist):
+            continue
+        if cand_exact_dist > current_exact_dist - LATER_CONTACT_MIN_FOOT_GAIN_M:
+            continue
+
+        score = cand_acc / (1.0 + cand_exact_dist)
+        if score > best_score:
+            best_idx = cand_idx
+            best_score = score
+
+    return best_idx
 
 # ── Per-event detection ───────────────────────────────────────────────────────
 
@@ -173,6 +266,12 @@ for ev in events:
         shot_score = np.nan_to_num(delta_speed, nan=0.0) * gc2
         spike_idx  = int(np.argmax(shot_score))
 
+    # Narrow multi-touch override: if the selected frame is a setup touch, promote
+    # a later local acceleration peak only when its exact-frame foot contact is
+    # clearly tighter. This keeps long shots stable while fixing pass-then-shot
+    # sequences like event 640.
+    spike_idx = maybe_promote_later_contact(window_ball, acc_mag, spike_idx)
+
     spike_acc  = float(acc_mag[spike_idx])
     shot_frame = int(window_ball.loc[spike_idx, "frame_number"])
     half, match_time_s = frame_to_match_time(shot_frame)
@@ -191,38 +290,10 @@ for ev in events:
     # is closest to the ball. Scan backwards to find it.
     CONTACT_LOOKBACK = 3
 
-    shooter_jersey = None
-    shooter_team   = None
-    shooter_part   = None
-    foot_dist      = np.inf
-
-    for offset in range(-CONTACT_LOOKBACK, 1):   # -3, -2, -1, 0
-        check_frame = shot_frame + offset
-        ball_row = ball_df[ball_df["frame_number"] == check_frame]
-        if ball_row.empty:
-            continue
-        cbx = float(ball_row["bx"].iloc[0])
-        cby = float(ball_row["by"].iloc[0])
-        cbz = float(ball_row["bz"].iloc[0])
-
-        ff = feet_df[feet_df["frame_number"] == check_frame].copy()
-        if ff.empty:
-            continue
-        ff["dist_m"] = np.sqrt(
-            (ff["x"] - cbx) ** 2 +
-            (ff["y"] - cby) ** 2 +
-            (ff["z"] - cbz) ** 2
-        )
-        row = ff.loc[ff["dist_m"].idxmin()]
-        d   = float(row["dist_m"])
-        if d < foot_dist:
-            foot_dist      = d
-            shooter_jersey = int(row["jersey_number"])
-            shooter_team   = str(row["team_name"])
-            shooter_part   = str(row["body_part_name"])
-
-    if foot_dist == np.inf:
-        foot_dist = np.nan
+    foot_dist, shooter_jersey, shooter_team, shooter_part = best_contact_in_lookback(
+        shot_frame,
+        CONTACT_LOOKBACK,
+    )
 
     low_confidence = (spike_acc < MIN_ACC_MPS2) or (np.isnan(foot_dist)) or (foot_dist > MAX_FOOT_DIST_M)
 
