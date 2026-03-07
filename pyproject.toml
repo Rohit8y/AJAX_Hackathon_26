@@ -1,0 +1,15 @@
+[project]
+name = "ajax-xml-explorer"
+version = "0.1.0"
+description = "XML match-analysis explorer for Ajax hackathon data"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "plotly>=5.18",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+    "pyarrow>=23.0.0",
+    "pypdf>=4.0.0",
+    "scipy>=1.17.1",
+]
