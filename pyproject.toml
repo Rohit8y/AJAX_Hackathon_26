@@ -8,6 +8,10 @@ dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.24.0",
     "pypdf>=4.0.0",
+    "matplotlib>=3.8",
+    "plotly>=5.18",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
 ]
 
 [dependency-groups]

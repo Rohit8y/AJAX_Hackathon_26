@@ -27,7 +27,7 @@ EVENT_CODES = [
 ]
 
 # Optional: extend the window around each event (seconds)
-PAD_BEFORE = 3.0   # seconds before event start
+PAD_BEFORE = 5.0   # seconds before event start
 PAD_AFTER  = 2.0   # seconds after event end
 
 # ── Option A: structured Frame objects ────────────────────────────────────────
@@ -52,12 +52,12 @@ for event, frames in results.items():
         print(f"  Ball speed (frame 0): {first.ball.speed:.2f} m/s")
 
     # Example: get pelvis position of each player in first frame
-    for player in first.players[:3]:
+    for player in first.players:
         pelvis = player.get_position(BodyPart.PELVIS)
         if pelvis:
             print(f"  Player {player.jersey_number:>2} ({player.team.name if player.team else '?'}): "
                   f"pelvis=({pelvis.x:.1f}, {pelvis.y:.1f}) cm")
-
+    quit()
 # ── Option B: flat DataFrame (best for analysis) ──────────────────────────────
 # One row per (frame × player × body_part).
 
