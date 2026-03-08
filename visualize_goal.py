@@ -50,15 +50,9 @@ EVENT_CODES = [
 PAD_BEFORE = 3.0   # seconds before event start
 PAD_AFTER  = 2.0   # seconds after event end
 
-# ── Team colours (hardcoded from verified data analysis) ───────────────────────
-# TEAM_A (val=2) = AJAX (~10 outfield players)
-# REFEREE (val=3) = Fortuna Sittard (~11 players, misleading enum name)
-# TEAM_B (val=4) = actual referees/linesmen (~3)
-# HOME (val=1) = misc (~2)
-
 TEAM_STYLE = {
-    Team.TEAM_A:  ('#e63946', 'AJAX'),
-    Team.REFEREE: ('#457b9d', 'Fortuna'),
+    Team.TEAM_A:  ('#457b9d', 'Fortuna'),
+    Team.REFEREE: ('#e63946', 'AJAX'),
     Team.TEAM_B:  ('#f4d35e', 'Referee'),
     Team.HOME:    ('#aaaaaa', 'Other'),
 }
