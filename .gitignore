@@ -209,3 +209,17 @@ __marimo__/
 # Large data files
 data/*.parquet
 viz/public/data/
+
+# Derived/organizer data files
+data/*.pkl
+data/*.csv
+data/*.xml
+data/*.pdf
+data/*.ipynb
+data/*.md
+
+# Notebooks
+*.ipynb
+
+# macOS
+.DS_Store
