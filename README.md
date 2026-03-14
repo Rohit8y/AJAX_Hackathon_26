@@ -7,7 +7,7 @@ Built using 3D skeleton tracking data (21 body joints per player at 25 fps) from
 <p align="center">
   <img src="demo-preview.gif" width="640" alt="3D skeleton at ball-contact frame — kicking leg highlighted in orange/red, grey body, rotating view" />
 </p>
-<p align="center"><em>Skeleton frozen at ball-contact frame — kicking leg (orange/red) highlighted against the neutral body</em></p>
+<p align="center"><em>Skeleton frozen at ball-contact frame — kicking leg (orange) highlighted against the neutral body</em></p>
 
 ---
 
