@@ -4,6 +4,11 @@ A biomechanics analysis toolkit built at **Ajax Hackathon 26** that extracts eve
 
 Built using 3D skeleton tracking data (21 body joints per player at 25 fps) from a full 90-minute match, the project surfaces 23 shot clips with per-shot scoring, timing analysis, and an interactive 3D viewer.
 
+<p align="center">
+  <img src="demo-preview.gif" width="640" alt="3D skeleton at ball-contact frame — kicking leg highlighted in orange/red, grey body, rotating view" />
+</p>
+<p align="center"><em>Skeleton frozen at ball-contact frame — kicking leg (orange/red) highlighted against the neutral body</em></p>
+
 ---
 
 ## Features
